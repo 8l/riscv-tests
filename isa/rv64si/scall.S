@@ -18,27 +18,32 @@ RVTEST_CODE_BEGIN
   #define sstatus mstatus
   #define scause mcause
   #define sepc mepc
+  #define sret mret
   #define stvec_handler mtvec_handler
-  #undef CAUSE_SUPERVISOR_ECALL
-  #define CAUSE_SUPERVISOR_ECALL CAUSE_MACHINE_ECALL
+  #undef SSTATUS_SPP
+  #define SSTATUS_SPP MSTATUS_MPP
 #endif
 
   li TESTNUM, 2
+
+  li t0, SSTATUS_SPP
+  csrc sstatus, t0
+  la t0, 1f
+  csrw sepc, t0
+  sret
+1:
+
+  li TESTNUM, 1
   scall
   j fail
-
-  j pass
 
   TEST_PASSFAIL
 
 stvec_handler:
-  li t1, CAUSE_SUPERVISOR_ECALL
+  li t1, CAUSE_USER_ECALL
   csrr t0, scause
   bne t0, t1, fail
-  csrr t0, sepc
-  addi t0, t0, 8
-  csrw sepc, t0
-  sret
+  j pass
 
 RVTEST_CODE_END
 

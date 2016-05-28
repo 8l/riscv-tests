@@ -13,25 +13,11 @@
 #endif
 
   .text
-  .align 6
-user_trap_entry:
-  j trap_entry
-
-  .align 6
-supervisor_trap_entry:
-  j supervisor_trap_entry
-
-  .align 6
-hypervisor_trap_entry:
-  j hypervisor_trap_entry
-
-  .align 6
-machine_trap_entry:
-  j trap_entry
-
-  .align 6
   .globl _start
 _start:
+  la t0, trap_entry
+  csrw mtvec, t0
+
   li  x1, 0
   li  x2, 0
   li  x3, 0
@@ -64,13 +50,11 @@ _start:
   li  x30,0
   li  x31,0
 
-  li t0, MSTATUS_PRV1; csrc mstatus, t0    # run tests in user mode
-  li t0, MSTATUS_IE1;  csrs mstatus, t0    # enable interrupts in user mode
   li t0, MSTATUS_FS;   csrs mstatus, t0    # enable FPU
   li t0, MSTATUS_XS;   csrs mstatus, t0    # enable accelerator
 
 #ifdef __riscv64
-  csrr t0, mcpuid
+  csrr t0, misa
   # make sure processor supports RV64 if this was compiled for RV64
   bltz t0, 1f
   li a0, 1234
@@ -146,9 +130,7 @@ _start:
   sll sp, sp, STKSHIFT
   add sp, sp, tp
 
-  la t0, _init
-  csrw mepc, t0
-  eret
+  j _init
 
 trap_entry:
   addi sp, sp, -272
@@ -191,6 +173,10 @@ trap_entry:
   jal handle_trap
   csrw mepc, a0
 
+  # Remain in M-mode after eret
+  li t0, MSTATUS_MPP
+  csrs mstatus, t0
+
   LREG x1, 1*REGBYTES(sp)
   LREG x2, 2*REGBYTES(sp)
   LREG x3, 3*REGBYTES(sp)
@@ -224,7 +210,7 @@ trap_entry:
   LREG x31, 31*REGBYTES(sp)
 
   addi sp, sp, 272
-  eret
+  mret
 
 .section ".tdata.begin"
 .globl _tdata_begin
@@ -237,3 +223,11 @@ _tdata_end:
 .section ".tbss.end"
 .globl _tbss_end
 _tbss_end:
+
+.section ".tohost","aw",@progbits
+.align 6
+.globl tohost
+tohost: .dword 0
+.align 6
+.globl fromhost
+fromhost: .dword 0
